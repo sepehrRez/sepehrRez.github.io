@@ -77,6 +77,53 @@
       padding: 32px 0;
       color: #aab6ca;
     }
+
+    
+    #chat-messages {
+    margin: 24px 0;
+    }
+
+    .bot-message,
+    .user-message {
+    padding: 12px;
+    border-radius: 10px;
+    margin: 10px 0;
+    overflow-wrap: anywhere;
+    }
+
+    .bot-message {
+    background: #1e293b;
+    }
+
+    .user-message {
+    background: #164e63;
+    text-align: right;
+    }
+
+    #chat-form {
+    display: flex;
+    gap: 10px;
+    }
+
+    #chat-input {
+    flex: 1;
+    min-width: 0;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #475569;
+    background: #0b1120;
+    color: white;
+    }
+
+    #chat-form button {
+    padding: 12px 18px;
+    border: 0;
+    border-radius: 8px;
+    background: #67e8f9;
+    color: #0b1120;
+    cursor: pointer;
+    }
+
   </style>
 </head>
 
@@ -127,17 +174,62 @@
       </article>
     </section>
 
+    
     <section id="assistant" class="card">
-      <h2>My AI Assistant</h2>
-      <p>
-        Soon, you will be able to ask questions about my
-        experience and projects here.
-      </p>
+    <h2>My AI Assistant</h2>
+    <p>Ask me about my skills and projects.</p>
+
+    <div id="chat-messages" aria-live="polite">
+        <p class="bot-message">
+        Hi! Ask me about my background or AI projects.
+        </p>
+    </div>
+
+    <form id="chat-form">
+        <input
+        id="chat-input"
+        type="text"
+        placeholder="Ask a question..."
+        autocomplete="off"
+        required
+        />
+        <button type="submit">Send</button>
+    </form>
     </section>
+
   </main>
 
   <footer>
     Personal AI Portfolio · Built with Python and AI
   </footer>
+
+  
+    const form = document.getElementById("chat-form");
+    const input = document.getElementById("chat-input");
+    const messages = document.getElementById("chat-messages");
+
+    form.addEventListener("submit", function (event) {
+    event.preventDefault();
+
+    const question = input.value.trim();
+
+    if (!question) return;
+
+    const userMessage = document.createElement("p");
+    userMessage.className = "user-message";
+    userMessage.textContent = question;
+
+    messages.appendChild(userMessage);
+
+    const botMessage = document.createElement("p");
+    botMessage.className = "bot-message";
+    botMessage.textContent =
+        "I received your question: " + question;
+
+    messages.appendChild(botMessage);
+
+    input.value = "";
+    });
+
 </body>
 </html>
