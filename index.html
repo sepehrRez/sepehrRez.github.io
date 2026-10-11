@@ -239,10 +239,10 @@
 
             loading.textContent = data.reply;
 
-        } catch (error) {
-            loading.textContent = "Sorry, something went wrong.";
-            console.error(error);
-        }
+        }  catch (error) {
+              loading.textContent = "Error: " + error.message;
+              console.error("Chat error:", error);
+          }
     });
 
     function addMessage(text, className) {
