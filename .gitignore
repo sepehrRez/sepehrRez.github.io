@@ -1,0 +1,11 @@
+
+# Private resume and local vector database
+AIBot/resume.pdf
+AIBot/chroma_db/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local secrets
+.env
