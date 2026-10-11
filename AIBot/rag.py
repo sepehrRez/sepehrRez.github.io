@@ -1,35 +1,36 @@
 
+import os
 from pathlib import Path
 
+from google import genai
+from google.genai import types
 from pypdf import PdfReader
-from sentence_transformers import SentenceTransformer
 import chromadb
 
 
-# Paths
 BASE_DIR = Path(__file__).resolve().parent
 RESUME_PATH = BASE_DIR / "resume.pdf"
 DB_PATH = BASE_DIR / "chroma_db"
 
-# Load embedding model
-print("Loading embedding model...")
-embedding_model = SentenceTransformer(
-    "sentence-transformers/all-MiniLM-L6-v2"
+embedding_client = genai.Client(
+    api_key=os.environ["GEMINI_API_KEY"]
 )
 
-# Create vector database
-chroma_client = chromadb.PersistentClient(path=str(DB_PATH))
+chroma_client = chromadb.PersistentClient(
+    path=str(DB_PATH)
+)
 
+# Use a new collection because the embedding dimensions changed.
 collection = chroma_client.get_or_create_collection(
-    name="resume",
+    name="resume_gemini",
     metadata={"hnsw:space": "cosine"}
 )
 
 
 def extract_text(pdf_path):
     reader = PdfReader(str(pdf_path))
-
     pages = []
+
     for page in reader.pages:
         text = page.extract_text() or ""
         if text.strip():
@@ -43,17 +44,41 @@ def split_into_chunks(text, chunk_size=120, overlap=30):
     chunks = []
 
     for start in range(0, len(words), chunk_size - overlap):
-        chunk_words = words[start:start + chunk_size]
+        chunk = words[start:start + chunk_size]
 
-        if not chunk_words:
+        if not chunk:
             break
 
-        chunks.append(" ".join(chunk_words))
+        chunks.append(" ".join(chunk))
 
         if start + chunk_size >= len(words):
             break
 
     return chunks
+
+
+def embed_texts(texts, task_type):
+    vectors = []
+
+    # Process batches to avoid oversized requests.
+    for start in range(0, len(texts), 50):
+        batch = texts[start:start + 50]
+
+        response = embedding_client.models.embed_content(
+            model="gemini-embedding-001",
+            contents=batch,
+            config=types.EmbedContentConfig(
+                task_type=task_type,
+                output_dimensionality=768
+            )
+        )
+
+        vectors.extend(
+            embedding.values
+            for embedding in response.embeddings
+        )
+
+    return vectors
 
 
 def index_resume():
@@ -66,20 +91,23 @@ def index_resume():
 
     if not text.strip():
         raise ValueError(
-            "No text extracted. The PDF may be scanned."
+            "No text extracted from the resume PDF."
         )
 
     chunks = split_into_chunks(text)
 
-    # Replace previous indexed chunks
+    if not chunks:
+        raise ValueError("No resume chunks were created.")
+
+    embeddings = embed_texts(
+        chunks,
+        "RETRIEVAL_DOCUMENT"
+    )
+
     existing = collection.get()
+
     if existing["ids"]:
         collection.delete(ids=existing["ids"])
-
-    embeddings = embedding_model.encode(
-        chunks,
-        normalize_embeddings=True
-    ).tolist()
 
     collection.add(
         ids=[f"chunk-{i}" for i in range(len(chunks))],
@@ -90,20 +118,22 @@ def index_resume():
     print(f"Indexed {len(chunks)} chunks.")
 
 
-def search_resume(question, top_k=3):
-    if collection.count() == 0:
+def search_resume(question, top_k=5):
+    count = collection.count()
+
+    if count == 0:
         raise RuntimeError(
-            "Resume is not indexed. Run index_resume() first."
+            "Resume is not indexed."
         )
 
-    query_embedding = embedding_model.encode(
+    query_embedding = embed_texts(
         [question],
-        normalize_embeddings=True
-    ).tolist()
+        "RETRIEVAL_QUERY"
+    )[0]
 
     results = collection.query(
-        query_embeddings=query_embedding,
-        n_results=min(top_k, collection.count())
+        query_embeddings=[query_embedding],
+        n_results=min(top_k, count)
     )
 
     return results["documents"][0]
@@ -118,9 +148,8 @@ if __name__ == "__main__":
         if question.lower() == "exit":
             break
 
-        chunks = search_resume(question)
-
-        print("\nRelevant resume sections:")
-        for i, chunk in enumerate(chunks, start=1):
+        for i, chunk in enumerate(
+            search_resume(question), start=1
+        ):
             print(f"\n--- Result {i} ---")
             print(chunk)
