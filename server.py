@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from google import genai
 import os
 from fastapi.middleware.cors import CORSMiddleware
-from AiBot.rag import search_resume
+from AIBot.rag import search_resume
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
