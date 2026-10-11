@@ -204,32 +204,55 @@
   </footer>
 
   <script>
+        
     const form = document.getElementById("chat-form");
     const input = document.getElementById("chat-input");
     const messages = document.getElementById("chat-messages");
 
-    form.addEventListener("submit", function (event) {
-    event.preventDefault();
+    form.addEventListener("submit", async function (event) {
+        event.preventDefault();
 
-    const question = input.value.trim();
+        const question = input.value.trim();
+        if (!question) return;
 
-    if (!question) return;
+        addMessage(question, "user-message");
+        input.value = "";
 
-    const userMessage = document.createElement("p");
-    userMessage.className = "user-message";
-    userMessage.textContent = question;
+        const loading = addMessage("Thinking...", "bot-message");
 
-    messages.appendChild(userMessage);
+        try {
+            const response = await fetch("http://127.0.0.1:8000/chat", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    message: question
+                })
+            });
 
-    const botMessage = document.createElement("p");
-    botMessage.className = "bot-message";
-    botMessage.textContent =
-        "I received your question: " + question;
+            const data = await response.json();
 
-    messages.appendChild(botMessage);
+            if (!response.ok || data.error) {
+                throw new Error(data.error || "Request failed");
+            }
 
-    input.value = "";
+            loading.textContent = data.reply;
+
+        } catch (error) {
+            loading.textContent = "Sorry, something went wrong.";
+            console.error(error);
+        }
     });
+
+    function addMessage(text, className) {
+        const message = document.createElement("p");
+        message.className = className;
+        message.textContent = text;
+        messages.appendChild(message);
+        return message;
+    }
+
 </script>
 </body>
 </html>
